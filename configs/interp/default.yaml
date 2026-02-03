@@ -1,0 +1,27 @@
+# Interpretability experiment configuration
+
+# Model
+checkpoint_path: "outputs/dt/checkpoints/best.pt"
+
+# Data
+data_path: "outputs/dqn/data/transitions.h5"
+num_samples: 1000
+
+# Probing
+probe_targets:
+  - "action"
+  - "rtg"
+  - "timestep"
+probe_epochs: 100
+probe_lr: 0.001
+
+# Attention analysis
+analyze_heads: true
+
+# Patching
+run_patching: false
+patching_samples: 100
+
+# Output
+output_dir: "outputs/interp"
+seed: 42

@@ -1,0 +1,31 @@
+# Decision Transformer training configuration
+
+# Data settings
+data_path: "outputs/dqn/data/transitions.h5"
+context_length: 20
+rtg_scale: 1.0
+train_split: 0.9
+
+# Optimization
+learning_rate: 0.0001
+weight_decay: 0.01
+batch_size: 64
+max_steps: 50000
+warmup_steps: 1000
+scheduler_type: "cosine"
+gradient_clip: 1.0
+
+# Evaluation
+eval_every: 1000
+save_every: 5000
+
+# Logging
+use_wandb: false
+wandb_project: "midt-dt"
+run_name: null
+
+# Reproducibility
+seed: 42
+
+# Output
+output_dir: "outputs/dt"

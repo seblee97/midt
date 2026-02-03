@@ -1,0 +1,15 @@
+# Decision Transformer model configuration
+
+# Model architecture
+embed_dim: 128
+num_layers: 3
+num_heads: 4
+dropout: 0.1
+max_timestep: 1000
+
+# Input dimensions
+state_dim: null  # Inferred from data
+action_dim: 4  # GridWorld has 4 actions
+
+# Observation type
+obs_type: "symbolic"
