@@ -1,9 +1,9 @@
 # DQN training configuration for GridWorld
 
 # Environment settings
-env_layout_path: "/Users/sebastianlee/Dropbox/Documents/Research/Projects/gridworld_env/configs/tasks/simple_two_room.txt"
-obs_mode: "symbolic_minimal"
-max_episode_steps: 200
+env_layout_path: "/Users/sebastianlee/Dropbox/Documents/Research/Projects/gridworld_env/src/gridworld_env/layouts/posner.txt"
+obs_mode: "pixels"
+max_episode_steps: 500
 
 # DQN hyperparameters
 learning_rate: 0.0001
@@ -11,21 +11,26 @@ buffer_size: 100000
 learning_starts: 1000
 batch_size: 32
 gamma: 0.99
-exploration_fraction: 0.1
+exploration_fraction: 0.5
 exploration_initial_eps: 1.0
 exploration_final_eps: 0.05
 target_update_interval: 1000
 train_freq: 4
 
 # Training
-total_timesteps: 100000
+total_timesteps: 1000000
 seed: 42
 
 # Logging
 use_wandb: false
 wandb_project: "midt-dqn"
-run_name: null
+run_name: test-dqn-gridworld
 log_interval: 100
+
+# Video recording
+record_video: true
+video_freq: 100
+video_fps: 10
 
 # Output
 output_dir: "outputs/dqn"
