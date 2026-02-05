@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+# Disable wandb by default (must be before any imports that might trigger it)
+import os
+os.environ.setdefault("WANDB_MODE", "disabled")
+
 import argparse
 from pathlib import Path
 
@@ -48,18 +52,30 @@ def main():
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create environment
+    # Create environment (with render support if recording videos)
     env = create_gridworld_env(
         layout_path=config.env_layout_path,
         obs_mode=config.obs_mode,
         max_steps=config.max_episode_steps,
+        render_mode="rgb_array" if config.record_video else None,
     )
+
+    # Create separate eval environment for test rollouts if recording
+    video_env = None
+    if config.record_video:
+        video_env = create_gridworld_env(
+            layout_path=config.env_layout_path,
+            obs_mode=config.obs_mode,
+            max_steps=config.max_episode_steps,
+            render_mode="rgb_array",
+        )
 
     # Create trainer
     trainer = DQNTrainer(
         env=env,
         config=config,
         output_dir=output_dir,
+        video_env=video_env,
     )
 
     # Save config
@@ -73,7 +89,7 @@ def main():
     print(f"Episodes collected: {results['num_episodes']}")
     print(f"Total transitions: {results['total_transitions']}")
     print(f"Mean episode reward: {results.get('mean_reward', 'N/A'):.4f}")
-    print(f"Data saved to: {output_dir / 'data' / 'transitions.h5'}")
+    print(f"Output saved to: {trainer.output_dir}")
 
 
 if __name__ == "__main__":
