@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -10,7 +12,7 @@ import numpy as np
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 
-from midt.agents.callbacks import EpisodeLoggerCallback, TransitionCollectorCallback
+from midt.agents.callbacks import EpisodeLoggerCallback, TransitionCollectorCallback, VideoRecorderCallback
 from midt.data.storage import TransitionStorage
 from midt.utils.config import DQNConfig
 
@@ -28,6 +30,7 @@ class DQNTrainer:
         config: DQNConfig,
         output_dir: str | Path,
         eval_env: Optional[gym.Env] = None,
+        video_env: Optional[gym.Env] = None,
     ):
         """Initialize the trainer.
 
@@ -36,13 +39,23 @@ class DQNTrainer:
             config: DQN configuration.
             output_dir: Directory for outputs (data, logs, checkpoints).
             eval_env: Optional separate environment for evaluation.
+            video_env: Optional environment for video recording (must have render_mode="rgb_array").
         """
         self.env = env
         self.config = config
-        self.output_dir = Path(output_dir)
         self.eval_env = eval_env
+        self.video_env = video_env
 
-        # Create output directories
+        # Set wandb mode based on config
+        if config.use_wandb:
+            os.environ["WANDB_MODE"] = "online"
+        else:
+            os.environ["WANDB_MODE"] = "disabled"
+
+        # Create timestamped run directory
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        run_name = f"{timestamp}_{config.run_name}" if config.run_name else timestamp
+        self.output_dir = Path(output_dir) / run_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
         (self.output_dir / "data").mkdir(exist_ok=True)
         (self.output_dir / "checkpoints").mkdir(exist_ok=True)
@@ -54,9 +67,12 @@ class DQNTrainer:
             mode="w",
         )
 
+        # Select policy based on observation mode
+        policy = "CnnPolicy" if config.obs_mode in ("pixels", "pixel") else "MlpPolicy"
+
         # Initialize DQN model
         self.model = DQN(
-            policy="MlpPolicy",
+            policy=policy,
             env=env,
             learning_rate=config.learning_rate,
             buffer_size=config.buffer_size,
@@ -120,6 +136,18 @@ class DQNTrainer:
             )
             callbacks.append(eval_callback)
 
+        # Add video recording callback if enabled
+        if self.config.record_video and self.video_env is not None:
+            video_callback = VideoRecorderCallback(
+                eval_env=self.video_env,
+                video_dir=self.output_dir / "videos",
+                record_freq=self.config.video_freq,
+                log_to_wandb=self.config.use_wandb,
+                fps=self.config.video_fps,
+                verbose=1,
+            )
+            callbacks.append(video_callback)
+
         # Train
         self.model.learn(
             total_timesteps=self.config.total_timesteps,
@@ -171,6 +199,7 @@ def create_gridworld_env(
     obs_mode: str = "symbolic_minimal",
     max_steps: Optional[int] = 200,
     posner_mode: bool = False,
+    render_mode: Optional[str] = None,
     **kwargs,
 ) -> gym.Env:
     """Create a GridWorld environment.
@@ -180,6 +209,7 @@ def create_gridworld_env(
         obs_mode: Observation mode.
         max_steps: Maximum steps per episode.
         posner_mode: Enable Posner cueing.
+        render_mode: Render mode (e.g., "rgb_array" for video recording).
         **kwargs: Additional environment arguments.
 
     Returns:
@@ -193,12 +223,16 @@ def create_gridworld_env(
 
     from gridworld_env import GridWorldEnv
 
+    # Only flatten for symbolic observations, not pixels
+    flatten = obs_mode not in ("pixels")
+
     env = GridWorldEnv(
         layout=layout_path,
         obs_mode=obs_mode,
         max_steps=max_steps,
         posner_mode=posner_mode,
-        flatten_obs=True,
+        flatten_obs=flatten,
+        render_mode=render_mode,
         **kwargs,
     )
 
