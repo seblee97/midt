@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
@@ -212,3 +213,157 @@ class EpisodeLoggerCallback(BaseCallback):
             "mean_length": np.mean(self._episode_lengths),
             "num_episodes": len(self._episode_rewards),
         }
+
+
+class VideoRecorderCallback(BaseCallback):
+    """Callback to periodically record training and evaluation episodes as videos.
+
+    Records both:
+    - Training episodes (with exploration noise) to see actual learning behavior
+    - Test episodes (deterministic) to see best-effort policy performance
+    """
+
+    def __init__(
+        self,
+        eval_env,
+        video_dir: str | Path,
+        record_freq: int = 10,
+        log_to_wandb: bool = False,
+        fps: int = 10,
+        verbose: int = 0,
+    ):
+        """Initialize the video recorder callback.
+
+        Args:
+            eval_env: Environment for test rollouts (must have render_mode="rgb_array").
+            video_dir: Directory to save videos.
+            record_freq: Record videos every N episodes.
+            log_to_wandb: Whether to log videos to Weights & Biases.
+            fps: Frames per second for video playback.
+            verbose: Verbosity level.
+        """
+        super().__init__(verbose)
+        self.eval_env = eval_env
+        self.video_dir = Path(video_dir)
+        self.record_freq = record_freq
+        self.log_to_wandb = log_to_wandb
+        self.fps = fps
+
+        # Episode tracking
+        self._episode_count = 0
+        self._video_count = 0
+
+        # Training episode recording state
+        self._recording_train = False
+        self._train_frames: list = []
+
+    def _on_training_start(self) -> None:
+        """Create video directory and check if training env supports rendering."""
+        self.video_dir.mkdir(parents=True, exist_ok=True)
+        # Start recording first training episode
+        self._recording_train = True
+        self._train_frames = []
+        self._capture_train_frame()
+
+    def _on_step(self) -> bool:
+        """Capture frames during training if recording."""
+        dones = self.locals.get("dones")
+
+        # Capture frame if recording training episode
+        if self._recording_train:
+            self._capture_train_frame()
+
+        # Check for episode end
+        if dones is not None and dones[0]:
+            self._on_episode_end()
+
+        return True
+
+    def _capture_train_frame(self) -> None:
+        """Capture a frame from the training environment."""
+        try:
+            frame = self.training_env.render()
+            if frame is not None:
+                self._train_frames.append(frame)
+        except Exception:
+            # Training env may not support rendering
+            pass
+
+    def _on_episode_end(self) -> None:
+        """Handle end of training episode."""
+        self._episode_count += 1
+
+        # Save training video if we were recording
+        if self._recording_train and self._train_frames:
+            self._save_video(self._train_frames, "train")
+            self._train_frames = []
+            self._recording_train = False
+
+            # Also record a test rollout
+            self._record_test_video()
+
+        # Check if we should start recording next episode
+        if self._episode_count % self.record_freq == 0:
+            self._recording_train = True
+            self._train_frames = []
+            # Capture initial frame on reset (will happen in next _on_step)
+
+    def _record_test_video(self) -> None:
+        """Record a deterministic test rollout."""
+        try:
+            import imageio
+        except ImportError:
+            if self.verbose > 0:
+                print("imageio not installed, skipping video recording")
+            return
+
+        frames = []
+        obs, _ = self.eval_env.reset()
+
+        frame = self.eval_env.render()
+        if frame is not None:
+            frames.append(frame)
+
+        while True:
+            action, _ = self.model.predict(obs, deterministic=True)
+            obs, _reward, terminated, truncated, _info = self.eval_env.step(action)
+
+            frame = self.eval_env.render()
+            if frame is not None:
+                frames.append(frame)
+
+            if terminated or truncated:
+                break
+
+        if frames:
+            self._save_video(frames, "test")
+
+    def _save_video(self, frames: list, video_type: str) -> None:
+        """Save frames as video file."""
+        try:
+            import imageio
+        except ImportError:
+            return
+
+        if not frames:
+            return
+
+        video_path = self.video_dir / f"ep{self._episode_count:04d}_{video_type}.mp4"
+        imageio.mimsave(str(video_path), frames, fps=self.fps)
+
+        if self.verbose > 0:
+            print(f"Saved {video_type} video to {video_path}")
+
+        # Log to wandb if enabled
+        if self.log_to_wandb:
+            try:
+                import wandb
+                if wandb.run is not None:
+                    wandb.log({
+                        f"video/{video_type}": wandb.Video(str(video_path), fps=self.fps, format="mp4"),
+                        "video_episode": self._episode_count,
+                    })
+            except ImportError:
+                pass
+
+        self._video_count += 1
