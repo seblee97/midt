@@ -38,6 +38,10 @@ dependencies = [
     # Visualization
     "matplotlib>=3.7.0",
     "seaborn>=0.12.0",
+
+    # Video recording
+    "imageio>=2.31.0",
+    "imageio-ffmpeg>=0.4.8",
 ]
 
 [project.optional-dependencies]
