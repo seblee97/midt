@@ -35,10 +35,15 @@ class DQNConfig(BaseModel):
     seed: int = Field(default=42, description="Random seed")
 
     # Logging
-    use_wandb: bool = Field(default=True, description="Use Weights & Biases")
+    use_wandb: bool = Field(default=False, description="Use Weights & Biases")
     wandb_project: str = Field(default="midt-dqn", description="W&B project name")
     run_name: Optional[str] = Field(default=None, description="Run name")
     log_interval: int = Field(default=100, description="Logging interval")
+
+    # Video recording
+    record_video: bool = Field(default=False, description="Record training and test videos")
+    video_freq: int = Field(default=10, description="Record videos every N episodes")
+    video_fps: int = Field(default=10, description="Video playback frames per second")
 
     # Output
     output_dir: str = Field(default="outputs", description="Output directory")
@@ -85,7 +90,7 @@ class TrainingConfig(BaseModel):
     save_every: int = Field(default=5000, description="Checkpoint interval")
 
     # Logging
-    use_wandb: bool = Field(default=True, description="Use Weights & Biases")
+    use_wandb: bool = Field(default=False, description="Use Weights & Biases")
     wandb_project: str = Field(default="midt-dt", description="W&B project name")
     run_name: Optional[str] = Field(default=None, description="Run name")
 
