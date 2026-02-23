@@ -20,7 +20,7 @@ OUTPUT_DIR="$HOME/ceph/midt_dqn/seed_${SEED}"
 cd "$PROJECT_DIR" || { echo "Project dir not found: $PROJECT_DIR"; exit 1; }
 mkdir -p outputs/logs
 
-source "$(conda info --base)/etc/profile.d/conda.sh"
+# source "$(conda info --base)/etc/profile.d/conda.sh"
 source "$HOME/venvs/$VENV/bin/activate"
 
 echo "Job:        $SLURM_JOB_ID (array task $SLURM_ARRAY_TASK_ID)"
