@@ -1,7 +1,7 @@
 # DQN training configuration for GridWorld
 
 # Environment settings
-env_layout_path: "/Users/sebastianlee/Dropbox/Documents/Research/Projects/gridworld_env/src/gridworld_env/layouts/posner.txt"
+env_layout_path: "../gridworld_env/src/gridworld_env/layouts/posner.txt"
 obs_mode: "pixels"
 max_episode_steps: 500
 
