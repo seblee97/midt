@@ -18,6 +18,11 @@ class DQNConfig(BaseModel):
     obs_mode: str = Field(default="symbolic_minimal", description="Observation mode")
     max_episode_steps: Optional[int] = Field(default=200, description="Max steps per episode")
 
+    # Pixel preprocessing (only used when obs_mode="pixels")
+    obs_resize: Optional[list[int]] = Field(default=None, description="Resize pixel obs to [H, W] before replay buffer")
+    obs_grayscale: bool = Field(default=False, description="Convert pixel obs to grayscale (1 channel)")
+    frame_stack: int = Field(default=1, description="Number of frames to stack along the channel axis")
+
     # DQN hyperparameters
     learning_rate: float = Field(default=1e-4, description="Learning rate")
     buffer_size: int = Field(default=100_000, description="Replay buffer size")

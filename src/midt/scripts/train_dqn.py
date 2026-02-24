@@ -52,12 +52,20 @@ def main():
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Pixel preprocessing kwargs (passed to both training and video envs)
+    pixel_kwargs = dict(
+        obs_resize=config.obs_resize,
+        obs_grayscale=config.obs_grayscale,
+        frame_stack=config.frame_stack,
+    )
+
     # Create environment (with render support if recording videos)
     env = create_gridworld_env(
         layout_path=config.env_layout_path,
         obs_mode=config.obs_mode,
         max_steps=config.max_episode_steps,
         render_mode="rgb_array" if config.record_video else None,
+        **pixel_kwargs,
     )
 
     # Create separate eval environment for test rollouts if recording
@@ -68,6 +76,7 @@ def main():
             obs_mode=config.obs_mode,
             max_steps=config.max_episode_steps,
             render_mode="rgb_array",
+            **pixel_kwargs,
         )
 
     # Create trainer

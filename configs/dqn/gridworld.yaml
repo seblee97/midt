@@ -3,6 +3,9 @@
 # Environment settings
 env_layout_path: "../gridworld_env/src/gridworld_env/layouts/posner.txt"
 obs_mode: "pixels"
+obs_resize: [84, 84]   # resize before replay buffer (Atari-style)
+obs_grayscale: true    # 1 channel: 84x84x1 = 7KB/frame vs 523KB raw
+frame_stack: 4         # stack 4 frames along channel axis -> 84x84x4
 max_episode_steps: 500
 
 # DQN hyperparameters

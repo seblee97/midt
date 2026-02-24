@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from collections import deque
+
 import gymnasium as gym
 import numpy as np
 from stable_baselines3 import DQN
@@ -15,6 +17,37 @@ from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 from midt.agents.callbacks import EpisodeLoggerCallback, TransitionCollectorCallback, VideoRecorderCallback
 from midt.data.storage import TransitionStorage
 from midt.utils.config import DQNConfig
+
+
+class FrameStackWrapper(gym.ObservationWrapper):
+    """Stack n grayscale frames along the channel axis.
+
+    Produces observations of shape (H, W, C * n_stack), which SB3's CnnPolicy
+    treats as a standard image with multiple channels (like Atari 4-frame stacking).
+    """
+
+    def __init__(self, env: gym.Env, n_stack: int = 4):
+        super().__init__(env)
+        self._n_stack = n_stack
+        self._frames: deque = deque(maxlen=n_stack)
+        h, w, c = env.observation_space.shape
+        self.observation_space = gym.spaces.Box(
+            low=0,
+            high=255,
+            shape=(h, w, c * n_stack),
+            dtype=np.uint8,
+        )
+
+    def observation(self, obs: np.ndarray) -> np.ndarray:
+        self._frames.append(obs)
+        return np.concatenate(list(self._frames), axis=-1)
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        self._frames.clear()
+        for _ in range(self._n_stack):
+            self._frames.append(obs)
+        return np.concatenate(list(self._frames), axis=-1), info
 
 
 class DQNTrainer:
@@ -200,6 +233,9 @@ def create_gridworld_env(
     max_steps: Optional[int] = 200,
     posner_mode: bool = False,
     render_mode: Optional[str] = None,
+    obs_resize: Optional[list] = None,
+    obs_grayscale: bool = False,
+    frame_stack: int = 1,
     **kwargs,
 ) -> gym.Env:
     """Create a GridWorld environment.
@@ -210,6 +246,9 @@ def create_gridworld_env(
         max_steps: Maximum steps per episode.
         posner_mode: Enable Posner cueing.
         render_mode: Render mode (e.g., "rgb_array" for video recording).
+        obs_resize: Resize pixel obs to [H, W] before storing in replay buffer.
+        obs_grayscale: Convert pixel obs to grayscale (1 channel).
+        frame_stack: Number of frames to stack along the channel axis.
         **kwargs: Additional environment arguments.
 
     Returns:
@@ -217,14 +256,15 @@ def create_gridworld_env(
     """
     # Import gridworld_env (assuming it's installed or in path)
     import sys
-    gridworld_path = Path("/Users/sebastianlee/Dropbox/Documents/Research/Projects/gridworld_env/src")
-    if str(gridworld_path) not in sys.path:
+    # Fallback: add sibling gridworld_env/src to path if not installed as a package
+    gridworld_path = Path(__file__).parents[4] / "gridworld_env" / "src"
+    if gridworld_path.exists() and str(gridworld_path) not in sys.path:
         sys.path.insert(0, str(gridworld_path))
 
     from gridworld_env import GridWorldEnv
 
     # Only flatten for symbolic observations, not pixels
-    flatten = obs_mode not in ("pixels")
+    flatten = obs_mode not in ("pixels",)
 
     env = GridWorldEnv(
         layout=layout_path,
@@ -235,5 +275,14 @@ def create_gridworld_env(
         render_mode=render_mode,
         **kwargs,
     )
+
+    # Pixel preprocessing (Atari-style pipeline)
+    if obs_mode == "pixels":
+        if obs_resize is not None:
+            env = gym.wrappers.ResizeObservation(env, shape=tuple(obs_resize))
+        if obs_grayscale:
+            env = gym.wrappers.GrayscaleObservation(env, keep_dim=True)
+        if frame_stack > 1:
+            env = FrameStackWrapper(env, n_stack=frame_stack)
 
     return env
